@@ -61,78 +61,88 @@ class DecoderLayer(tf.keras.Model):
     def call(self, x):
         return self.decoder_layer(x)
     
-    class SelfAttention(tf.keras.layers.Layer):
-        def __init__(self, channels):
-            super(SelfAttention, self).__init__()
-            self.query_conv = tf.keras.layers.Conv2D(channels // 8, kernel_size=1)
-            self.key_conv = tf.keras.layers.Conv2D(channels // 8, kernel_size=1)
-            self.value_conv = tf.keras.layers.Conv2D(channels, kernel_size=1)
-            self.gamma = tf.Variable(initial_value=0.0, trainable=True)
+   class SelfAttention(layers.Layer):
+    def __init__(self, filters):
+        super(SelfAttention, self).__init__()
+        self.query_conv = layers.Conv2D(filters // 8, kernel_size=1, padding="same", kernel_initializer="he_normal")
+        self.key_conv = layers.Conv2D(filters // 8, kernel_size=1, padding="same", kernel_initializer="he_normal")
+        self.value_conv = layers.Conv2D(filters, kernel_size=1, padding="same", kernel_initializer="he_normal")
+        self.gamma = tf.Variable(initial_value=0.0, trainable=True)  # Trainable scalar
     
-        def call(self, x):
-            query = self.query_conv(x)
-            key = self.key_conv(x)
-            value = self.value_conv(x)
-            attention = tf.nn.softmax(tf.matmul(tf.reshape(query, [query.shape[0], -1, query.shape[-1]]),
-                                                 tf.reshape(key, [key.shape[0], -1, key.shape[-1]], transpose_b=True)))
-            attention = tf.matmul(attention, tf.reshape(value, [value.shape[0], -1, value.shape[-1]]))
-            attention = tf.reshape(attention, x.shape)
-            return self.gamma * attention + x
+    def call(self, inputs):
+        batch_size, height, width, channels = inputs.shape
+        query = tf.reshape(self.query_conv(inputs), [batch_size, -1, height * width])  # (B, F', H*W)
+        key = tf.reshape(self.key_conv(inputs), [batch_size, height * width, -1])      # (B, H*W, F')
+        value = tf.reshape(self.value_conv(inputs), [batch_size, height * width, -1])  # (B, H*W, F)
 
+        attention_map = tf.nn.softmax(tf.matmul(query, key), axis=-1)  # Self-attention scores
+        out = tf.matmul(attention_map, value)  # Weighted combination of values
+        out = tf.reshape(out, [batch_size, height, width, channels])  # Reshape to original dims
 
+        return self.gamma * out + inputs  # Add residual connection
+
+# Generator Class
 class Generator(tf.keras.Model):
     def __init__(self):
         super(Generator, self).__init__()
         
-        # Resize Input
-        p_layer_1 = DecoderLayer(filters=2, kernel_size=4, strides_s = 2, apply_dropout=False, add = True) 
-        p_layer_2  = DecoderLayer(filters=2, kernel_size=4, strides_s = 2, apply_dropout=False, add = True)
-        p_layer_3  = EncoderLayer(filters=2, kernel_size=(6,1),strides_s = (4,1), apply_batchnorm=False, add = True)
+        # Initial Resizing Layers (placeholders for your DecoderLayer logic)
+        self.p_layers = [
+            DecoderLayer(filters=2, kernel_size=4, strides_s=2, apply_dropout=False, add=True),
+            DecoderLayer(filters=2, kernel_size=4, strides_s=2, apply_dropout=False, add=True),
+            EncoderLayer(filters=2, kernel_size=(6, 1), strides_s=(4, 1), apply_batchnorm=False, add=True)
+        ]
         
-        self.p_layers = [p_layer_1,p_layer_2,p_layer_3]
-        
-        self.attention1 = SelfAttention(512)
-        # self.attention2 = SelfAttention(128)
-        
-        #encoder
-        encoder_layer_1 = EncoderLayer(filters=64*1,  kernel_size=4,apply_batchnorm=False)   
-        encoder_layer_2 = EncoderLayer(filters=64*2, kernel_size=4)       
-        encoder_layer_3 = EncoderLayer(filters=64*4, kernel_size=4)       
-        encoder_layer_4 = EncoderLayer(filters=64*8, kernel_size=4)       
-        encoder_layer_5 = EncoderLayer(filters=64*8, kernel_size=4)       
-        self.encoder_layers = [encoder_layer_1, encoder_layer_2, encoder_layer_3, encoder_layer_4,
-                               encoder_layer_5]
+        # Encoder
+        self.encoder_layers = [
+            EncoderLayer(filters=64, kernel_size=4, apply_batchnorm=False),
+            EncoderLayer(filters=128, kernel_size=4),
+            EncoderLayer(filters=256, kernel_size=4),
+            EncoderLayer(filters=512, kernel_size=4),
+            EncoderLayer(filters=512, kernel_size=4)
+        ]
 
-        # deconder
-        decoder_layer_1 = DecoderLayer(filters=64*8, kernel_size=4, apply_dropout=True)   
-        decoder_layer_2 = DecoderLayer(filters=64*8, kernel_size=4,apply_dropout=True)   
-        decoder_layer_3 = DecoderLayer(filters=64*8, kernel_size=4, apply_dropout=True)   
-        decoder_layer_4 = DecoderLayer(filters=64*4, kernel_size=4)   
-        self.decoder_layers = [decoder_layer_1, decoder_layer_2, decoder_layer_3, decoder_layer_4]
+        # Self-Attention Layer after Encoder
+        self.attention = SelfAttention(filters=512)
 
-       
-        initializer = tf.random_normal_initializer(mean=0., stddev=0.02)
-        self.last = layers.Conv2DTranspose(filters=2, kernel_size=4, strides=2, padding='same',
-                                           kernel_initializer=initializer, activation='tanh')
+        # Decoder
+        self.decoder_layers = [
+            DecoderLayer(filters=512, kernel_size=4, apply_dropout=True),
+            DecoderLayer(filters=512, kernel_size=4, apply_dropout=True),
+            DecoderLayer(filters=256, kernel_size=4, apply_dropout=False),
+            DecoderLayer(filters=128, kernel_size=4, apply_dropout=False)
+        ]
+
+        # Output Layer
+        self.last = layers.Conv2DTranspose(
+            filters=2, kernel_size=4, strides=2, padding='same',
+            kernel_initializer=tf.random_normal_initializer(mean=0.0, stddev=0.02),
+            activation='tanh'
+        )
 
     def call(self, x):
-        # pass the encoder and record xs
+        # Pre-processing layers
         for p_layer in self.p_layers:
             x = p_layer(x)
-        x = self.attention1(x)
-        # x = self.attention2(x)
+
+        # Encoder
         encoder_xs = []
         for encoder_layer in self.encoder_layers:
             x = encoder_layer(x)
             encoder_xs.append(x)
-        encoder_xs = encoder_xs[:-1][::-1]    # reverse
-        assert len(encoder_xs) == 4
+        
+        # Apply Self-Attention
+        x = self.attention(x)
 
-        # pass the decoder and apply skip connection
+        # Skip connections (reverse order for decoder)
+        encoder_xs = encoder_xs[:-1][::-1]
+        assert len(encoder_xs) == 4  # Ensure matching skip connections
+
+        # Decoder with skip connections
         for i, decoder_layer in enumerate(self.decoder_layers):
             x = decoder_layer(x)
-            x = tf.concat([x, encoder_xs[i]], axis=-1)     # skip connect
+            x = tf.concat([x, encoder_xs[i]], axis=-1)  # Skip connections
 
-        return self.last(x)        # last
-
+        # Final layer
+        return self.last(x)
 
