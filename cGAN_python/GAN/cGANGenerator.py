@@ -91,8 +91,8 @@ class Generator(tf.keras.Model):
         
         self.p_layers = [p_layer_1,p_layer_2,p_layer_3]
         
-        self.attention1 = SelfAttention(64)
-        self.attention2 = SelfAttention(128)
+        self.attention1 = SelfAttention(512)
+        # self.attention2 = SelfAttention(128)
         
         #encoder
         encoder_layer_1 = EncoderLayer(filters=64*1,  kernel_size=4,apply_batchnorm=False)   
@@ -120,7 +120,7 @@ class Generator(tf.keras.Model):
         for p_layer in self.p_layers:
             x = p_layer(x)
         x = self.attention1(x)
-        x = self.attention2(x)
+        # x = self.attention2(x)
         encoder_xs = []
         for encoder_layer in self.encoder_layers:
             x = encoder_layer(x)
