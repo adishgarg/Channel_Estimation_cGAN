@@ -61,7 +61,23 @@ class DecoderLayer(tf.keras.Model):
     def call(self, x):
         return self.decoder_layer(x)
     
+    class SelfAttention(tf.keras.layers.Layer):
+        def __init__(self, channels):
+            super(SelfAttention, self).__init__()
+            self.query_conv = tf.keras.layers.Conv2D(channels // 8, kernel_size=1)
+            self.key_conv = tf.keras.layers.Conv2D(channels // 8, kernel_size=1)
+            self.value_conv = tf.keras.layers.Conv2D(channels, kernel_size=1)
+            self.gamma = tf.Variable(initial_value=0.0, trainable=True)
     
+        def call(self, x):
+            query = self.query_conv(x)
+            key = self.key_conv(x)
+            value = self.value_conv(x)
+            attention = tf.nn.softmax(tf.matmul(tf.reshape(query, [query.shape[0], -1, query.shape[-1]]),
+                                                 tf.reshape(key, [key.shape[0], -1, key.shape[-1]], transpose_b=True)))
+            attention = tf.matmul(attention, tf.reshape(value, [value.shape[0], -1, value.shape[-1]]))
+            attention = tf.reshape(attention, x.shape)
+            return self.gamma * attention + x
 
 
 class Generator(tf.keras.Model):
@@ -75,7 +91,8 @@ class Generator(tf.keras.Model):
         
         self.p_layers = [p_layer_1,p_layer_2,p_layer_3]
         
-        
+        self.attention1 = SelfAttention(64)
+        self.attention2 = SelfAttention(128)
         
         #encoder
         encoder_layer_1 = EncoderLayer(filters=64*1,  kernel_size=4,apply_batchnorm=False)   
@@ -102,7 +119,8 @@ class Generator(tf.keras.Model):
         # pass the encoder and record xs
         for p_layer in self.p_layers:
             x = p_layer(x)
-
+        x = self.attention1(x)
+        x = self.attention2(x)
         encoder_xs = []
         for encoder_layer in self.encoder_layers:
             x = encoder_layer(x)
