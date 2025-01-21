@@ -173,5 +173,4 @@ if __name__ == "__main__":
     plt.plot(ep,nm,'^-r')
     plt.xlabel('Epoch')
     plt.ylabel('NMSE')
-    plt.show();
-
+    plt.savefig("output.png")
