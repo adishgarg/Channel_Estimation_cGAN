@@ -24,7 +24,7 @@ layers = tf.keras.layers
 
 
 # data path
-path = "../Data_Generation/Gan_Data/Gan_0_dBIndoor2p4_64ant_32users_8pilot.mat"
+path = "Data_Generation_matlab/Gan_Data/Gan_0_dBIndoor2p4_64ant_32users_8pilot.mat"
 
 
 # batch = 1 produces good results on U-NET
@@ -90,13 +90,12 @@ def generated_image(model, test_input, tar, t=0):
     
 
     title = ['Input Y', 'Target H', 'Prediction H']
-    
     for i in range(3):
         plt.subplot(1, 3, i+1)
         plt.title(title[i])
         plt.imshow(display_list[i]) 
         plt.axis("off")
-    plt.savefig(os.path.join("generated_img", "img_"+str(t)+".png"))
+    plt.savefig(os.path.join("cGAN_python/generated_img", "img_"+str(t)+".png"))
 
 
 

@@ -61,7 +61,7 @@ class DecoderLayer(tf.keras.Model):
     def call(self, x):
         return self.decoder_layer(x)
     
-   class SelfAttention(layers.Layer):
+class SelfAttention(layers.Layer):
     def __init__(self, filters):
         super(SelfAttention, self).__init__()
         self.query_conv = layers.Conv2D(filters // 8, kernel_size=1, padding="same", kernel_initializer="he_normal")
@@ -70,16 +70,26 @@ class DecoderLayer(tf.keras.Model):
         self.gamma = tf.Variable(initial_value=0.0, trainable=True)  # Trainable scalar
     
     def call(self, inputs):
-        batch_size, height, width, channels = inputs.shape
-        query = tf.reshape(self.query_conv(inputs), [batch_size, -1, height * width])  # (B, F', H*W)
-        key = tf.reshape(self.key_conv(inputs), [batch_size, height * width, -1])      # (B, H*W, F')
-        value = tf.reshape(self.value_conv(inputs), [batch_size, height * width, -1])  # (B, H*W, F)
+        batch_size, height, width, channels = tf.shape(inputs)[0], tf.shape(inputs)[1], tf.shape(inputs)[2], tf.shape(inputs)[3]
 
-        attention_map = tf.nn.softmax(tf.matmul(query, key), axis=-1)  # Self-attention scores
-        out = tf.matmul(attention_map, value)  # Weighted combination of values
-        out = tf.reshape(out, [batch_size, height, width, channels])  # Reshape to original dims
+        # Compute query, key, and value
+        query = self.query_conv(inputs)  # (B, H, W, F')
+        key = self.key_conv(inputs)      # (B, H, W, F')
+        value = self.value_conv(inputs)  # (B, H, W, F)
 
-        return self.gamma * out + inputs  # Add residual connection
+        # Reshape for compatibility in matrix multiplication
+        query = tf.reshape(query, [batch_size, -1, channels // 8])  # (B, H*W, F')
+        key = tf.reshape(key, [batch_size, channels // 8, -1])      # (B, F', H*W)
+        value = tf.reshape(value, [batch_size, -1, channels])       # (B, H*W, F)
+
+        # Compute attention map and output
+        attention_map = tf.nn.softmax(tf.matmul(query, key), axis=-1)  # (B, H*W, H*W)
+        out = tf.matmul(attention_map, value)  # (B, H*W, F)
+        out = tf.reshape(out, [batch_size, height, width, channels])  # (B, H, W, C)
+
+        # Add residual connection
+        return self.gamma * out + inputs
+
 
 # Generator Class
 class Generator(tf.keras.Model):

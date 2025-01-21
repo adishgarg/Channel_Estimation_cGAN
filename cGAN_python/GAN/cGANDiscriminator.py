@@ -13,7 +13,34 @@ layers = tf.keras.layers
 """
 The Discriminator is a PatchGAN.
 """
+class SelfAttention(layers.Layer):
+    def __init__(self, filters):
+        super(SelfAttention, self).__init__()
+        self.query_conv = layers.Conv2D(filters // 8, kernel_size=1, padding="same", kernel_initializer="he_normal")
+        self.key_conv = layers.Conv2D(filters // 8, kernel_size=1, padding="same", kernel_initializer="he_normal")
+        self.value_conv = layers.Conv2D(filters, kernel_size=1, padding="same", kernel_initializer="he_normal")
+        self.gamma = tf.Variable(initial_value=0.0, trainable=True)  # Trainable scalar
+    
+    def call(self, inputs):
+        batch_size, height, width, channels = tf.shape(inputs)[0], tf.shape(inputs)[1], tf.shape(inputs)[2], tf.shape(inputs)[3]
 
+        # Compute query, key, and value
+        query = self.query_conv(inputs)  # (B, H, W, F')
+        key = self.key_conv(inputs)      # (B, H, W, F')
+        value = self.value_conv(inputs)  # (B, H, W, F)
+
+        # Reshape for compatibility in matrix multiplication
+        query = tf.reshape(query, [batch_size, -1, channels // 8])  # (B, H*W, F')
+        key = tf.reshape(key, [batch_size, channels // 8, -1])      # (B, F', H*W)
+        value = tf.reshape(value, [batch_size, -1, channels])       # (B, H*W, F)
+
+        # Compute attention map and output
+        attention_map = tf.nn.softmax(tf.matmul(query, key), axis=-1)  # (B, H*W, H*W)
+        out = tf.matmul(attention_map, value)  # (B, H*W, F)
+        out = tf.reshape(out, [batch_size, height, width, channels])  # (B, H, W, C)
+
+        # Add residual connection
+        return self.gamma * out + inputs
 
 class Discriminator(tf.keras.Model):
     def __init__(self):
