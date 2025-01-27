@@ -29,6 +29,6 @@ def load_and_save_mat_file(mat_file_path, save_dir):
     print(f"Saved plot as: {save_path}")
 
 # Example: Load and save from a .mat file generated at epoch 10
-mat_file_path = 'Eest_cGAN_1_0db_Indoor2p4_64ant_32users_8pilot.mat'
+mat_file_path = 'results/Results\Eest_cGAN_3_0db_Indoor2p4_64ant_32users_8pilot.mat'
 save_dir = 'saved_plots'
 load_and_save_mat_file(mat_file_path, save_dir)

@@ -143,6 +143,7 @@ class Generator(tf.keras.Model):
         
         # Apply Self-Attention
         x = self.attention(x)
+        x = tf.keras.layers.LayerNormalization()(x)
 
         # Skip connections (reverse order for decoder)
         encoder_xs = encoder_xs[:-1][::-1]

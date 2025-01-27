@@ -85,13 +85,3 @@ class Discriminator(tf.keras.Model):
         x = self.zero_pad2(x)
         return self.last(x)
 
-
-
-
-
-
-
-
-
-
-

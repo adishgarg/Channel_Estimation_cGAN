@@ -66,6 +66,15 @@ def discriminator_loss(disc_real_output, disc_generated_output):
     total_disc_loss = tf.reduce_mean(real_loss) + tf.reduce_mean(generated_loss)
     return total_disc_loss
 
+def residual_block(inputs, filters):
+    """Defines a residual block with skip connection."""
+    x = tf.keras.layers.Conv2D(filters, kernel_size=3, strides=1, padding="same")(inputs)
+    x = tf.keras.layers.BatchNormalization()(x)
+    x = tf.keras.layers.ReLU()(x)
+    x = tf.keras.layers.Conv2D(filters, kernel_size=3, strides=1, padding="same")(x)
+    x = tf.keras.layers.BatchNormalization()(x)
+    return tf.keras.layers.Add()([x, inputs])
+
 
 def generator_loss(disc_generated_output, gen_output, target, l2_weight=100):
     """
@@ -181,7 +190,7 @@ def train(epochs):
 if __name__ == "__main__":
 
     # train
-    nm, ep = train(epochs=10)
+    nm, ep = train(epochs=30)
     
     plt.figure()
     plt.plot(ep,nm,'^-r')
